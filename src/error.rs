@@ -2,14 +2,14 @@ pub mod errors {
     use notify;
     use std::io;
     use toml::de;
-    use std::sync::mpsc;
     use serde_json;
+    use std::sync::mpsc;
 
     error_chain! {
         foreign_links {
-            Notify(notify::Error);
             Io(io::Error);
-            Deserialize(de::Error);
+            Toml(de::Error);
+            Notify(notify::Error);
             Json(serde_json::Error);
             Channel(mpsc::RecvError);
         }

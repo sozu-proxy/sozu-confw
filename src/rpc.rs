@@ -6,6 +6,7 @@ use sozu_command::state::ConfigState;
 use sozu_command::data::{ConfigCommand, ConfigMessage, ConfigMessageAnswer, ConfigMessageStatus};
 
 use error::errors;
+use util::ConsoleMessage;
 
 fn generate_id() -> String {
     let s: String = thread_rng().gen_ascii_chars().take(6).collect();
@@ -21,35 +22,44 @@ pub fn order_command(channel: &mut Channel<ConfigMessage, ConfigMessageAnswer>, 
     ));
 
     match channel.read_message() {
-        None => println!("the proxy didn't answer"),
-        Some(message) => {
-            if id != message.id {
-                println!("received message with invalid id: {:?}", message);
+        None => {
+            let print = format!("No response from the proxy");
+            ConsoleMessage::Error(&print).println();
+        }
+        Some(response) => {
+            if id != response.id {
+                let print = format!("Received message with invalid id: {:?}", response);
+                ConsoleMessage::Error(&print).println();
                 return;
             }
-            match message.status {
+            match response.status {
                 ConfigMessageStatus::Processing => {
                     // do nothing here
                     // for other messages, we would loop over read_message
                     // until an error or ok message was sent
                 }
                 ConfigMessageStatus::Error => {
-                    println!("Could not execute order: {}", message.message);
+                    let print = format!("Could not execute order: {}", response.message);
+                    ConsoleMessage::Error(&print).println();
                 }
                 ConfigMessageStatus::Ok => {
-                    match order {
-                        Order::AddInstance(_) => println!("Backend added : {}", message.message),
-                        Order::RemoveInstance(_) => println!("Backend removed : {} ", message.message),
-                        Order::AddCertificate(_) => println!("Certificate added: {}", message.message),
-                        Order::RemoveCertificate(_) => println!("Certificate removed: {}", message.message),
-                        Order::AddHttpFront(_) => println!("Http front added: {}", message.message),
-                        Order::RemoveHttpFront(_) => println!("Http front removed: {}", message.message),
-                        Order::AddHttpsFront(_) => println!("Https front added: {}", message.message),
-                        Order::RemoveHttpsFront(_) => println!("Https front removed: {}", message.message),
-                        _ => {
-                            // do nothing for now
+                    let print = match order {
+                        Order::AddInstance(_) => format!("Backend added : {}", response.message),
+                        Order::RemoveInstance(_) => format!("Backend removed : {} ", response.message),
+                        Order::AddCertificate(_) => format!("Certificate added: {}", response.message),
+                        Order::RemoveCertificate(_) => format!("Certificate removed: {}", response.message),
+                        Order::AddHttpFront(_) => format!("Http front added: {}", response.message),
+                        Order::RemoveHttpFront(_) => format!("Http front removed: {}", response.message),
+                        Order::AddHttpsFront(_) => format!("Https front added: {}", response.message),
+                        Order::RemoveHttpsFront(_) => format!("Https front removed: {}", response.message),
+                        order => {
+                            let message = format!("Unsupported order: {:?}", order);
+                            ConsoleMessage::Warn(&message).println();
+                            return;
                         }
-                    }
+                    };
+
+                    ConsoleMessage::Success(&print).println();
                 }
             }
         }

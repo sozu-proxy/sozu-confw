@@ -17,6 +17,7 @@ extern crate serde_json;
 extern crate sozu_command_lib as sozu_command;
 
 mod rpc;
+mod util;
 mod error;
 mod parser;
 mod watcher;
@@ -63,8 +64,6 @@ fn main() {
         let parsed_value = value.parse::<u64>().expect("interval must be an integer");
         Duration::from_secs(parsed_value)
     }).unwrap();
-
-    println!("Watching file `{}`. Updating every {} second(s).", config_file, update_interval.as_secs());
 
     watcher::watch(config_file, socket_path, update_interval).unwrap();
 }
