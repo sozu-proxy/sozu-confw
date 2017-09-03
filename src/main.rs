@@ -7,17 +7,19 @@ extern crate serde_derive;
 #[macro_use]
 extern crate error_chain;
 
-extern crate notify;
 extern crate toml;
-extern crate serde;
-extern crate serde_json;
-extern crate ansi_term;
 extern crate rand;
+extern crate serde;
+extern crate notify;
 extern crate mio_uds;
+extern crate ansi_term;
+extern crate serde_json;
 extern crate sozu_command_lib as sozu_command;
 
-mod watcher;
+mod rpc;
 mod error;
+mod parser;
+mod watcher;
 
 use clap::{App, Arg};
 
