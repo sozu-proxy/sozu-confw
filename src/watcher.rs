@@ -8,6 +8,7 @@ use sozu_command::config::Config;
 use mio_uds::UnixStream;
 use sozu_command::channel::Channel;
 use rand::{thread_rng, Rng};
+use serde_json;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
@@ -27,8 +28,9 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
     let mut channel: Channel<ConfigMessage, ConfigMessageAnswer> = Channel::new(stream, 10000, 20000);
     channel.set_nonblocking(false);
 
-    // Current state should read from
-    let mut current_state = ConfigState::new();
+    println!("Retrieving current proxy state");
+    let mut current_state = initialize_config_state(&mut channel).unwrap();
+    println!("Current state initialized. Waiting for changes...");
 
     loop {
         match rx.recv() {
@@ -113,7 +115,6 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                     sticky_session: sticky_session
                 });
 
-                println!("Adding HttpFront: {:?}", add_http_front);
                 state.handle_order(add_http_front);
             }
 
@@ -153,8 +154,6 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                     sticky_session: sticky_session
                 });
 
-                println!("Adding Certificate: {:?}", add_certificate);
-                println!("Adding HttpsFront: {:?}", add_https_front);
                 state.handle_order(add_certificate);
                 state.handle_order(add_https_front);
             }
@@ -171,7 +170,6 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                 }).collect();
 
                 for order in add_instances {
-                    println!("Adding Instance: {:?}", order);
                     state.handle_order(&order);
                 }
             }
@@ -203,16 +201,18 @@ fn order_command(channel: &mut Channel<ConfigMessage, ConfigMessageAnswer>, orde
                     // until an error or ok message was sent
                 }
                 ConfigMessageStatus::Error => {
-                    println!("could not execute order: {}", message.message);
+                    println!("Could not execute order: {}", message.message);
                 }
                 ConfigMessageStatus::Ok => {
                     match order {
-                        Order::AddInstance(_) => println!("backend added : {}", message.message),
-                        Order::RemoveInstance(_) => println!("backend removed : {} ", message.message),
-                        Order::AddCertificate(_) => println!("certificate added: {}", message.message),
-                        Order::RemoveCertificate(_) => println!("certificate removed: {}", message.message),
-                        Order::AddHttpFront(_) => println!("front added: {}", message.message),
-                        Order::RemoveHttpFront(_) => println!("front removed: {}", message.message),
+                        Order::AddInstance(_) => println!("Backend added : {}", message.message),
+                        Order::RemoveInstance(_) => println!("Backend removed : {} ", message.message),
+                        Order::AddCertificate(_) => println!("Certificate added: {}", message.message),
+                        Order::RemoveCertificate(_) => println!("Certificate removed: {}", message.message),
+                        Order::AddHttpFront(_) => println!("Http front added: {}", message.message),
+                        Order::RemoveHttpFront(_) => println!("Http front removed: {}", message.message),
+                        Order::AddHttpsFront(_) => println!("Https front added: {}", message.message),
+                        Order::RemoveHttpsFront(_) => println!("Https front removed: {}", message.message),
                         _ => {
                             // do nothing for now
                         }
@@ -221,6 +221,23 @@ fn order_command(channel: &mut Channel<ConfigMessage, ConfigMessageAnswer>, orde
             }
         }
     }
+}
+
+fn initialize_config_state(channel: &mut Channel<ConfigMessage, ConfigMessageAnswer>) -> errors::Result<ConfigState> {
+    let id = generate_id();
+    channel.write_message(&ConfigMessage::new(
+        id.clone(),
+        ConfigCommand::DumpState,
+        None
+    ));
+
+    return match channel.read_message() {
+        None => Err(errors::ErrorKind::NoResponse("initialize".to_owned()).into()),
+        Some(answer) => {
+            let response: ConfigStateResponse = serde_json::from_str(&answer.message)?;
+            Ok(response.state)
+        }
+    };
 }
 
 fn generate_id() -> String {
@@ -238,4 +255,10 @@ struct RoutingConfig<'a> {
     frontends: HashSet<&'a str>,
     backends: Vec<&'a str>,
     sticky_session: Option<bool>
+}
+
+#[derive(Debug, Default, Clone, Deserialize)]
+struct ConfigStateResponse<'a> {
+    id: &'a str,
+    state: ConfigState
 }

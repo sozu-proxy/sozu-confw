@@ -10,6 +10,7 @@ extern crate error_chain;
 extern crate notify;
 extern crate toml;
 extern crate serde;
+extern crate serde_json;
 extern crate ansi_term;
 extern crate rand;
 extern crate mio_uds;
