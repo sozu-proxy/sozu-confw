@@ -31,6 +31,7 @@ fn main() {
             .long("config")
             .value_name("FILE")
             .help("What config file to watch")
+            .default_value("applications.toml")
             .takes_value(true)
             .required(false)
         )
@@ -53,13 +54,14 @@ fn main() {
         )
         .get_matches();
 
-    let config_file = matches.value_of("config").unwrap_or("/Users/mbs/workspace/rust/sozu/confw/assets/applications.toml");
-    let socket_path = matches.value_of("socket").unwrap_or("/Users/mbs/test");
+    let config_file = matches.value_of("config").unwrap();
+    let socket_path = matches.value_of("socket").unwrap();
     let update_interval = matches.value_of("interval").map(|value| {
         let parsed_value = value.parse::<u64>().expect("interval must be an integer");
         Duration::from_secs(parsed_value)
-    }).expect("required interval");
+    }).unwrap();
 
     println!("Watching file `{}`. Updating every {} second(s).", config_file, update_interval.as_secs());
-    watcher::watch(config_file, socket_path, update_interval);
+
+    watcher::watch(config_file, socket_path, update_interval).unwrap();
 }

@@ -3,8 +3,8 @@ use toml;
 use sozu_command::certificate::{split_certificate_chain, calculate_fingerprint};
 use sozu_command::data::{ConfigCommand, ConfigMessage, ConfigMessageAnswer, ConfigMessageStatus};
 use sozu_command::messages::{HttpFront, HttpsFront, Instance, CertFingerprint, CertificateAndKey, Order};
-use sozu_command::state::{AppId, ConfigState};
-use sozu_command::config::{Config, AppConfig};
+use sozu_command::state::ConfigState;
+use sozu_command::config::Config;
 use mio_uds::UnixStream;
 use sozu_command::channel::Channel;
 use rand::{thread_rng, Rng};
@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use error::errors;
 
@@ -23,8 +24,10 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
     watcher.watch(config_file, RecursiveMode::NonRecursive)?;
 
     let stream = UnixStream::connect(socket_path).expect("Could not connect to the command unix socket.");
-    let mut channel: &mut Channel<ConfigMessage, ConfigMessageAnswer> = &mut Channel::new(stream, 10000, 20000);
+    let mut channel: Channel<ConfigMessage, ConfigMessageAnswer> = Channel::new(stream, 10000, 20000);
+    channel.set_nonblocking(false);
 
+    // Current state should read from
     let mut current_state = ConfigState::new();
 
     loop {
@@ -36,13 +39,15 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
 
                         match parse_config_file(&path) {
                             Ok(new_state) => {
-                                println!("{:?}", new_state);
-
-                                println!("Sending new configuration to server.");
+                                println!("Creating diff");
                                 let orders = current_state.diff(&new_state);
 
+                                if orders.len() > 0 {
+                                    println!("Sending new configuration to server.");
+                                }
+
                                 for order in orders {
-                                    order_command(channel, order);
+                                    order_command(&mut channel, order);
                                 }
 
                                 current_state = new_state;
@@ -89,8 +94,9 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
         for routing_config in routing_configs {
             let hostname = &routing_config.hostname.to_owned();
             let path_begin = &routing_config.path_begin.unwrap_or("/").to_owned();
+            let sticky_session = routing_config.sticky_session.unwrap_or(false);
 
-            let mut authorities: Vec<(String, u16)> = routing_config.backends.iter().map(|authority| {
+            let authorities: Vec<(String, u16)> = routing_config.backends.iter().map(|authority| {
                 let mut split = authority.split(":");
 
                 let host = split.next().expect("host is required").to_owned();
@@ -103,25 +109,27 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                 let add_http_front = &Order::AddHttpFront(HttpFront {
                     app_id: app_id.clone(),
                     hostname: hostname.clone(),
-                    path_begin: path_begin.clone()
+                    path_begin: path_begin.clone(),
+                    sticky_session: sticky_session
                 });
 
+                println!("Adding HttpFront: {:?}", add_http_front);
                 state.handle_order(add_http_front);
             }
 
             if routing_config.frontends.contains(&"HTTPS") {
                 let certificate = routing_config.certificate.map(|path| {
-                    let certificate = Config::load_file(path).expect("could not load file");
+                    let certificate = Config::load_file(path).expect("could not load certificate");
                     certificate
                 }).expect("HTTPS requires a certificate");
 
                 let key = routing_config.key.map(|path| {
-                    let key: String = Config::load_file(path).expect("could not load file");
+                    let key: String = Config::load_file(path).expect("could not load key");
                     key
                 }).expect("HTTPS requires a key");
 
                 let certificate_chain = routing_config.certificate_chain.map(|path| {
-                    let chain = Config::load_file(&path).expect("could not load file");
+                    let chain = Config::load_file(&path).expect("could not load certificate chain");
 
                     split_certificate_chain(chain)
                 }).unwrap_or(Vec::new());
@@ -136,20 +144,23 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                     .map(|it| CertFingerprint(it))
                     .expect("could not calculate fingerprint");
 
-                let add_cert_and_key = &Order::AddCertificate(certificate_and_key);
+                let add_certificate = &Order::AddCertificate(certificate_and_key);
                 let add_https_front = &Order::AddHttpsFront(HttpsFront {
                     app_id: app_id.clone(),
                     hostname: hostname.clone(),
                     path_begin: path_begin.clone(),
-                    fingerprint: fingerprint
+                    fingerprint: fingerprint,
+                    sticky_session: sticky_session
                 });
 
-                state.handle_order(add_cert_and_key);
+                println!("Adding Certificate: {:?}", add_certificate);
+                println!("Adding HttpsFront: {:?}", add_https_front);
+                state.handle_order(add_certificate);
                 state.handle_order(add_https_front);
             }
 
             {
-                let mut add_instances: Vec<Order> = authorities.iter().map(|authority| {
+                let add_instances: Vec<Order> = authorities.iter().map(|authority| {
                     let (ref host, port): (String, u16) = *authority;
 
                     Order::AddInstance(Instance {
@@ -160,6 +171,7 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                 }).collect();
 
                 for order in add_instances {
+                    println!("Adding Instance: {:?}", order);
                     state.handle_order(&order);
                 }
             }
@@ -224,5 +236,6 @@ struct RoutingConfig<'a> {
     key: Option<&'a str>,
     certificate_chain: Option<&'a str>,
     frontends: HashSet<&'a str>,
-    backends: Vec<&'a str>
+    backends: Vec<&'a str>,
+    sticky_session: Option<bool>
 }

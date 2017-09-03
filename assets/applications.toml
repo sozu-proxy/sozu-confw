@@ -1,19 +1,22 @@
 [[test]]
-hostname = "lolcatho.st"
+hostname = "tohsa.ka"
 path_begin = "/api" # optional
-certificate = "../lib/assets/certificate.pem" # optional
-key = "../lib/assets/key.pem" # optional
-certificate_chain = "../lib/assets/certificate_chain.pem" # optional
+certificate = "../sozu/lib/assets/certificate.pem" # optional
+key = "../sozu/lib/assets/key.pem" # optional
+certificate_chain = "../sozu/lib/assets/certificate_chain.pem" # optional
 frontends = ["HTTP", "HTTPS"] # list of proxy tags
-backends  = [ "127.0.0.1:1022" ] # list of IP/port
+backends  = ["127.0.0.1:1021"] # list of IP/port
+sticky_session = false
 
 [[test]]
 hostname  = "misa.ka"
 frontends = ["HTTP"]
-backends  = [ "127.0.0.1:1021" ]
+backends  = ["127.0.0.1:1022"]
+sticky_session = true
 
 [[other]]
 hostname = "asu.ka"
 path_begin = "/other"
 frontends = ["HTTP"]
-backends = ["127.0.0.1:1025"]
+backends = ["127.0.0.1:1023"]
+sticky_session = true
