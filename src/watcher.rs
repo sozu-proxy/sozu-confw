@@ -3,7 +3,6 @@ use sozu_command::channel::Channel;
 use sozu_command::data::{ConfigMessage, ConfigMessageAnswer};
 use notify::{RecommendedWatcher, Watcher, RecursiveMode, DebouncedEvent};
 
-use std::str::FromStr;
 use std::time::Duration;
 use std::sync::mpsc::channel;
 

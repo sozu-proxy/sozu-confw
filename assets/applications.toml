@@ -1,20 +1,20 @@
-[[test]]
+[[magus]]
 hostname = "tohsa.ka"
-path_begin = "/api" # optional
-certificate = "assets/certificate.pem" # optional
-key = "assets/key.pem" # optional
-certificate_chain = "assets/certificate_chain.pem" # optional
-frontends = ["HTTP", "HTTPS"] # list of proxy tags
-backends  = ["127.0.0.1:1021"] # list of IP/port
-sticky_session = false # optional, defaults to false
+path_begin = "/api"
+certificate = "assets/certificate.pem"
+key = "assets/key.pem"
+certificate_chain = "assets/certificate_chain.pem"
+frontends = ["HTTP", "HTTPS"]
+backends  = ["127.0.0.1:1021"]
+sticky_session = false
 
-[[test]]
+[[esper]]
 hostname  = "misa.ka"
 frontends = ["HTTP"]
 backends  = ["127.0.0.1:1022"]
 sticky_session = true
 
-[[other]]
+[[pilot]]
 hostname = "asu.ka"
 path_begin = "/other"
 frontends = ["HTTP"]

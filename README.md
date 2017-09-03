@@ -13,4 +13,62 @@ Here is an overview and brief description of the options made available:
 -s, --socket <SOCKET_PATH>    What socket sozu is listening on
 ```
 
- 
+## Config file
+
+Your app routing config file defines what applications sozu will manage. The most basic example can be written as:
+
+```
+[[magus]]
+hostname = "tohsa.ka"
+frontends = ["HTTP"]
+backends  = ["127.0.0.1:1021"]
+```
+
+Here we are defining an HTTP app named `magus` which has the host `tohsa.ka` and is routed towards `127.0.0.1:1021`.
+
+If we wanted to also define this as an HTTPS app, we would need to include some more details:
+
+```
+[[magus]]
+hostname = "tohsa.ka"
+key = "assets/key.pem"
+certificate = "assets/certificate.pem"
+certificate_chain = "assets/certificate_chain.pem"
+frontends = ["HTTP", "HTTPS"]
+backends  = ["127.0.0.1:1021"]
+```
+
+Here we see three new parameters: `key`, `certificate`, and `certificate_chain`. These are the paths to the associated files and are *required* to create an HTTPS app.
+
+Now, what if we wanted the same host, but pointing towards two sets of backends based on a path suffix?
+
+This is as simple as defining a `path_begin`:
+
+```
+[[magus]]
+hostname = "tohsa.ka"
+path_begin = "/archer"
+frontends = ["HTTP"]
+backends  = ["127.0.0.1:1021"]
+
+[[magus]]
+hostname = "tohsa.ka"
+path_begin = "/saber"
+frontends = ["HTTP"]
+backends  = ["127.0.0.1:1022"]
+```
+
+Additionally, you may also set sticky sessions with `sticky_session` like so:
+
+```
+[[magus]]
+hostname = "tohsa.ka"
+path_begin = "/archer"
+frontends = ["HTTP"]
+backends  = ["127.0.0.1:1021"]
+sticky_session = false
+```
+
+If `sticky_session` is omitted, it is set to false.
+
+A final note, this file may be named anything you want as long as you set `--config`. Otherwise `sozuconf` will look for `applications.toml` in `$PWD`.
