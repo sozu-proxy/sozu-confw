@@ -13,6 +13,8 @@ Here is an overview and brief description of the options made available:
 -s, --socket <SOCKET_PATH>    What socket sozu is listening on
 ```
 
+You can turn on logging by setting the `RUST_LOG` environment variable. More details can be found [here](https://doc.rust-lang.org/log/env_logger/index.html#enabling-logging).
+
 ## Config file
 
 Your app routing config file defines what applications sozu will manage. The most basic example can be written as:
