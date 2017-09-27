@@ -21,11 +21,10 @@ pub mod errors {
                 description("no response from the proxy")
                 display("No response from the proxy while attempting '{}'.", action)
             }
-            ErrorProxyResponse(action: String) {
+            ErrorProxyResponse(e: String) {
                 description("no response from the proxy")
-                display("Proxy responded with an error while attempting '{}'.", action)
+                display("Proxy responded with an error: {}.", e)
             }
-
         }
     }
 }

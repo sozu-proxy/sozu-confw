@@ -39,7 +39,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> B
             .and_then(move |response| {
                 if id != response.id {
                     error!("Received message with invalid id: {:?}.", response);
-                    return Err(errors::ErrorKind::ErrorProxyResponse("".to_string()).into());
+                    return Err(errors::ErrorKind::ErrorProxyResponse("Invalid message ID".to_string()).into());
                 }
 
                 match response.status {
@@ -51,7 +51,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> B
                     }
                     ConfigMessageStatus::Error => {
                         error!("Could not execute order: {}", response.message);
-                        Err(errors::ErrorKind::ErrorProxyResponse("".to_string()).into())
+                        Err(errors::ErrorKind::ErrorProxyResponse(response.message).into())
                     }
                     ConfigMessageStatus::Ok => {
                         let (item, action) = match order {
@@ -65,7 +65,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> B
                             Order::RemoveHttpsFront(_) => ("HTTPS front", "removed"),
                             order => {
                                 warn!("Unsupported order: {:?}", order);
-                                return Err(errors::ErrorKind::ErrorProxyResponse("".to_owned()).into());
+                                return Err(errors::ErrorKind::ErrorProxyResponse("Unsupported order".to_string()).into());
                             }
                         };
 
