@@ -1,3 +1,4 @@
+use futures::Future;
 use tokio_core::reactor::Core;
 use sozu_command::state::ConfigState;
 use notify::{RecommendedWatcher, Watcher, RecursiveMode, DebouncedEvent};
@@ -35,13 +36,16 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
                             Ok(new_state) => {
                                 let orders = current_state.diff(&new_state);
 
-                                if orders.is_empty() {
+                                if !orders.is_empty() {
                                     info!("Sending new configuration to server.");
 
-                                    let execution_future = execute_orders(socket_path, &handle, &orders);
-                                    core.run(execution_future)?;
+                                    let execution_future = execute_orders(socket_path, &handle, &orders)
+                                        .map(|_| new_state)
+                                        .or_else(|_| get_config_state(socket_path, &handle));
 
-                                    current_state = new_state;
+                                    current_state = core.run(execution_future)?;
+                                } else {
+                                    warn!("No changes made.");
                                 }
                             }
                             Err(_) => {
