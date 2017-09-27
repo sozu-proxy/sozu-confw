@@ -7,7 +7,7 @@ use sozu_command::messages::{HttpFront, HttpsFront, Instance, CertFingerprint, C
 use std::path::PathBuf;
 use std::collections::{HashMap, HashSet};
 
-use error::errors;
+use util::errors;
 
 pub fn parse_config_file(path: &PathBuf) -> errors::Result<ConfigState> {
     let path = path.to_str().expect("Could not convert path to str");
@@ -41,7 +41,7 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                     app_id: app_id.clone(),
                     hostname: hostname.clone(),
                     path_begin: path_begin.clone(),
-                    sticky_session: sticky_session
+                    sticky_session
                 });
 
                 state.handle_order(add_http_front);
@@ -65,22 +65,21 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                 }).unwrap_or(Vec::new());
 
                 let certificate_and_key = CertificateAndKey {
-                    certificate: certificate,
-                    key: key,
-                    certificate_chain: certificate_chain
+                    certificate,
+                    key,
+                    certificate_chain
                 };
 
                 let fingerprint = calculate_fingerprint(&certificate_and_key.certificate.as_bytes()[..])
-                    .map(|it| CertFingerprint(it))
-                    .expect("could not calculate fingerprint");
+                    .map(|it| CertFingerprint(it))?;
 
                 let add_certificate = &Order::AddCertificate(certificate_and_key);
                 let add_https_front = &Order::AddHttpsFront(HttpsFront {
                     app_id: app_id.clone(),
                     hostname: hostname.clone(),
                     path_begin: path_begin.clone(),
-                    fingerprint: fingerprint,
-                    sticky_session: sticky_session
+                    fingerprint,
+                    sticky_session
                 });
 
                 state.handle_order(add_certificate);
@@ -94,7 +93,7 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                     Order::AddInstance(Instance {
                         app_id: app_id.clone(),
                         ip_address: host.clone(),
-                        port: port
+                        port
                     })
                 }).collect();
 

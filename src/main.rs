@@ -7,18 +7,24 @@ extern crate serde_derive;
 #[macro_use]
 extern crate error_chain;
 
+#[macro_use]
+extern crate log;
+
 extern crate toml;
 extern crate rand;
 extern crate serde;
 extern crate notify;
-extern crate mio_uds;
-extern crate ansi_term;
+extern crate openssl;
+extern crate futures;
+extern crate tokio_uds;
+extern crate tokio_core;
 extern crate serde_json;
+extern crate pretty_env_logger;
+extern crate sozu_command_futures as command;
 extern crate sozu_command_lib as sozu_command;
 
 mod rpc;
 mod util;
-mod error;
 mod parser;
 mod watcher;
 
@@ -27,6 +33,8 @@ use clap::{App, Arg};
 use std::time::Duration;
 
 fn main() {
+    pretty_env_logger::init().unwrap();
+
     let matches = App::new("sozuconfw")
         .version(crate_version!())
         .about("Watch sozu app routing configs for updates")
@@ -65,5 +73,12 @@ fn main() {
         Duration::from_secs(parsed_value)
     }).unwrap();
 
-    watcher::watch(config_file, socket_path, update_interval).unwrap();
+    match watcher::watch(config_file, socket_path, update_interval) {
+        Ok(_) => {
+            info!("Exiting sozuconfw");
+        }
+        Err(err) => {
+            error!("{}", err.0);
+        }
+    };
 }
