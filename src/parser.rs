@@ -28,7 +28,7 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
             let sticky_session = routing_config.sticky_session.unwrap_or(false);
 
             let authorities: Vec<(String, u16)> = routing_config.backends.iter().map(|authority| {
-                let mut split = authority.split(":");
+                let mut split = authority.split(':');
 
                 let host = split.next().expect("host is required").to_owned();
                 let port = split.next().unwrap_or("80").parse::<u16>().expect("could not parse port");
@@ -49,20 +49,18 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
 
             if routing_config.frontends.contains(&"HTTPS") {
                 let certificate = routing_config.certificate.map(|path| {
-                    let certificate = Config::load_file(path).expect("could not load certificate");
-                    certificate
+                    Config::load_file(path).expect("could not load certificate")
                 }).expect("HTTPS requires a certificate");
 
                 let key = routing_config.key.map(|path| {
-                    let key: String = Config::load_file(path).expect("could not load key");
-                    key
+                    Config::load_file(path).expect("could not load key")
                 }).expect("HTTPS requires a key");
 
                 let certificate_chain = routing_config.certificate_chain.map(|path| {
-                    let chain = Config::load_file(&path).expect("could not load certificate chain");
+                    let chain = Config::load_file(path).expect("could not load certificate chain");
 
                     split_certificate_chain(chain)
-                }).unwrap_or(Vec::new());
+                }).unwrap_or_default();
 
                 let certificate_and_key = CertificateAndKey {
                     certificate,
@@ -70,8 +68,11 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
                     certificate_chain
                 };
 
-                let fingerprint = calculate_fingerprint(&certificate_and_key.certificate.as_bytes()[..])
-                    .map(|it| CertFingerprint(it))?;
+                let fingerprint: CertFingerprint;
+                {
+                    let bytes = calculate_fingerprint(&certificate_and_key.certificate.as_bytes()[..])?;
+                    fingerprint = CertFingerprint(bytes);
+                }
 
                 let add_certificate = &Order::AddCertificate(certificate_and_key);
                 let add_https_front = &Order::AddHttpsFront(HttpsFront {

@@ -35,10 +35,10 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
                             Ok(new_state) => {
                                 let orders = current_state.diff(&new_state);
 
-                                if orders.len() > 0 {
+                                if orders.is_empty() {
                                     info!("Sending new configuration to server.");
 
-                                    let execution_future = execute_orders(socket_path, &handle, orders);
+                                    let execution_future = execute_orders(socket_path, &handle, &orders);
                                     core.run(execution_future)?;
 
                                     current_state = new_state;

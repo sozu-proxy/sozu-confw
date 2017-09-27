@@ -17,12 +17,12 @@ fn generate_id() -> String {
     format!("ID-{}", s)
 }
 
-pub fn execute_orders(socket_path: &str, handle: &Handle, orders: Vec<Order>) -> Box<Future<Item=Vec<()>, Error=errors::Error>> {
+pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> Box<Future<Item=Vec<()>, Error=errors::Error>> {
     let stream = UnixStream::connect(socket_path, handle).unwrap();
     let mut client = SozuCommandClient::new(stream);
 
     let mut message_futures: Vec<Box<Future<Item=(), Error=errors::Error>>> = Vec::new();
-    for order in &orders {
+    for order in orders {
         let id = generate_id();
         let message = ConfigMessage::new(
             id.clone(),
@@ -85,7 +85,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: Vec<Order>) ->
 }
 
 pub fn get_config_state(socket_path: &str, handle: &Handle) -> Box<Future<Item=ConfigState, Error=errors::Error>> {
-    let stream = UnixStream::connect(socket_path, &handle).unwrap();
+    let stream = UnixStream::connect(socket_path, handle).unwrap();
     let mut client = SozuCommandClient::new(stream);
 
     let message = ConfigMessage::new(
