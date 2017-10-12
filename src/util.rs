@@ -17,6 +17,18 @@ pub mod errors {
         }
 
         errors {
+            InvalidPath {
+                description("path is invalid")
+                display("Path is invalid.")
+            }
+            FileLoad {
+                description("could not load file")
+                display("File could not be loaded")
+            }
+            MissingItem(item: String) {
+                description("missing required item")
+                display("Item `{}` required, but not present.", item)
+            }
             NoProxyResponse(action: String) {
                 description("no response from the proxy")
                 display("No response from the proxy while attempting '{}'.", action)

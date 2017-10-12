@@ -7,16 +7,16 @@ use sozu_command::messages::{HttpFront, HttpsFront, Instance, CertFingerprint, C
 use std::path::PathBuf;
 use std::collections::{HashMap, HashSet};
 
-use util::errors;
+use util::errors::*;
 
-pub fn parse_config_file(path: &PathBuf) -> errors::Result<ConfigState> {
-    let path = path.to_str().expect("Could not convert path to str");
+pub fn parse_config_file(path: &PathBuf) -> Result<ConfigState> {
+    let path = path.to_str().ok_or(ErrorKind::InvalidPath)?;
     let data = Config::load_file(path)?;
 
     parse_config(&data)
 }
 
-fn parse_config(data: &str) -> errors::Result<ConfigState> {
+fn parse_config(data: &str) -> Result<ConfigState> {
     let mut state = ConfigState::new();
 
     let app_map: HashMap<String, Vec<RoutingConfig>> = toml::from_str(data)?;
@@ -27,14 +27,18 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
             let path_begin = &routing_config.path_begin.unwrap_or("/").to_owned();
             let sticky_session = routing_config.sticky_session.unwrap_or(false);
 
-            let authorities: Vec<(String, u16)> = routing_config.backends.iter().map(|authority| {
+            let authorities = routing_config.backends.iter().map(|authority| {
                 let mut split = authority.split(':');
 
-                let host = split.next().expect("host is required").to_owned();
-                let port = split.next().unwrap_or("80").parse::<u16>().expect("could not parse port");
-
-                (host, port)
-            }).collect();
+                return match (split.next(), split.next()) {
+                    (Some(host), Some(port)) => {
+                        port.parse::<u16>().map(|port| (host.to_owned(), port))
+                            .chain_err(|| ErrorKind::FileLoad)
+                    },
+                    (Some(host), None) => Ok((host.to_owned(), 80)),
+                    _ => Err(ErrorKind::InvalidPath.into())
+                }
+            }).collect::<Result<Vec<(String, u16)>>>()?;
 
             if routing_config.frontends.contains(&"HTTP") {
                 let add_http_front = &Order::AddHttpFront(HttpFront {
@@ -48,19 +52,19 @@ fn parse_config(data: &str) -> errors::Result<ConfigState> {
             }
 
             if routing_config.frontends.contains(&"HTTPS") {
-                let certificate = routing_config.certificate.map(|path| {
-                    Config::load_file(path).expect("could not load certificate")
-                }).expect("HTTPS requires a certificate");
+                let certificate = routing_config.certificate
+                    .ok_or(ErrorKind::MissingItem("Certificate".to_string()).into())
+                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad))?;
 
-                let key = routing_config.key.map(|path| {
-                    Config::load_file(path).expect("could not load key")
-                }).expect("HTTPS requires a key");
+                let key = routing_config.key
+                    .ok_or(ErrorKind::MissingItem("Key".to_string()).into())
+                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad))?;
 
-                let certificate_chain = routing_config.certificate_chain.map(|path| {
-                    let chain = Config::load_file(path).expect("could not load certificate chain");
-
-                    split_certificate_chain(chain)
-                }).unwrap_or_default();
+                let certificate_chain = routing_config.certificate_chain
+                    .ok_or(ErrorKind::MissingItem("Certificate Chain".to_string()).into())
+                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad))
+                    .map(|chain| split_certificate_chain(chain))
+                    .unwrap_or_default();
 
                 let certificate_and_key = CertificateAndKey {
                     certificate,
