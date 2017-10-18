@@ -61,8 +61,8 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
                     DebouncedEvent::Rename(old_path, new_path) => {
                         // Track changed filename
                         info!("File renamed:\n\tOld path: {}\n\tNew path: {}.",
-                              old_path.to_str().ok_or(ErrorKind::InvalidPath(old_path.clone()))?,
-                              new_path.to_str().ok_or(ErrorKind::InvalidPath(new_path.clone()))?
+                              old_path.to_str().ok_or_else(|| ErrorKind::InvalidPath(old_path.clone()))?,
+                              new_path.to_str().ok_or_else(|| ErrorKind::InvalidPath(new_path.clone()))?
                         );
 
                         watcher.unwatch(old_path)?;
