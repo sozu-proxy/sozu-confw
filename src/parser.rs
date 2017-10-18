@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use util::errors::*;
 
 pub fn parse_config_file(path: &PathBuf) -> Result<ConfigState> {
-    let path = path.to_str().ok_or(ErrorKind::InvalidPath)?;
+    let path = path.to_str().ok_or(ErrorKind::InvalidPath(path.to_path_buf()))?;
     let data = Config::load_file(path)?;
 
     parse_config(&data)
@@ -33,10 +33,10 @@ fn parse_config(data: &str) -> Result<ConfigState> {
                 return match (split.next(), split.next()) {
                     (Some(host), Some(port)) => {
                         port.parse::<u16>().map(|port| (host.to_owned(), port))
-                            .chain_err(|| ErrorKind::FileLoad)
+                            .chain_err(|| ErrorKind::ParseError("Could not parse port".to_owned()))
                     },
                     (Some(host), None) => Ok((host.to_owned(), 80)),
-                    _ => Err(ErrorKind::InvalidPath.into())
+                    _ => Err(ErrorKind::ParseError("Missing host".to_owned()).into())
                 }
             }).collect::<Result<Vec<(String, u16)>>>()?;
 
@@ -54,15 +54,15 @@ fn parse_config(data: &str) -> Result<ConfigState> {
             if routing_config.frontends.contains(&"HTTPS") {
                 let certificate = routing_config.certificate
                     .ok_or(ErrorKind::MissingItem("Certificate".to_string()).into())
-                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad))?;
+                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad(path.to_string())))?;
 
                 let key = routing_config.key
                     .ok_or(ErrorKind::MissingItem("Key".to_string()).into())
-                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad))?;
+                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad(path.to_string())))?;
 
                 let certificate_chain = routing_config.certificate_chain
                     .ok_or(ErrorKind::MissingItem("Certificate Chain".to_string()).into())
-                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad))
+                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad(path.to_string())))
                     .map(|chain| split_certificate_chain(chain))
                     .unwrap_or_default();
 

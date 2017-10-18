@@ -42,7 +42,7 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
 
                                     let execution_future = execute_orders(socket_path, &handle, &orders)?
                                         .map(|_| new_state)
-                                        .or_else(|e| {
+                                        .or_else(|_| {
                                             info!("Error sending orders to proxy. Resynchronizing state.");
                                             get_config_state(socket_path, &handle).unwrap_or_else(|e| Box::new(err(e)))
                                         });
@@ -61,8 +61,8 @@ pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) ->
                     DebouncedEvent::Rename(old_path, new_path) => {
                         // Track changed filename
                         info!("File renamed:\n\tOld path: {}\n\tNew path: {}.",
-                              old_path.to_str().ok_or(ErrorKind::InvalidPath)?,
-                              new_path.to_str().ok_or(ErrorKind::InvalidPath)?
+                              old_path.to_str().ok_or(ErrorKind::InvalidPath(old_path.clone()))?,
+                              new_path.to_str().ok_or(ErrorKind::InvalidPath(new_path.clone()))?
                         );
 
                         watcher.unwatch(old_path)?;

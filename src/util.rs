@@ -6,6 +6,8 @@ pub mod errors {
     use serde_json;
     use std::sync::mpsc;
 
+    use std::path::PathBuf;
+
     error_chain! {
         foreign_links {
             Io(io::Error);
@@ -17,25 +19,25 @@ pub mod errors {
         }
 
         errors {
-            InvalidPath {
+            InvalidPath(path: PathBuf) {
                 description("path is invalid")
-                display("Path is invalid.")
+                display("Path '{:?}' is invalid.", path)
             }
-            FileLoad {
+            FileLoad(filename: String) {
                 description("could not load file")
-                display("File could not be loaded")
+                display("File '{}' could not be loaded.", filename)
+            }
+            ParseError(issue: String) {
+                description("encountered error while parsing")
+                display("Parse error: {}.", issue)
             }
             MissingItem(item: String) {
                 description("missing required item")
                 display("Item `{}` required, but not present.", item)
             }
-            NoProxyResponse(action: String) {
-                description("no response from the proxy")
-                display("No response from the proxy while attempting '{}'.", action)
-            }
-            ErrorProxyResponse(e: String) {
-                description("no response from the proxy")
-                display("Proxy responded with an error: {}.", e)
+            ProxyError(error: String) {
+                description("the proxy encountered an error")
+                display("Proxy responded with an error: {}.", error)
             }
         }
     }
