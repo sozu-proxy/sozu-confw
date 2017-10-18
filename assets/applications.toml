@@ -1,9 +1,9 @@
 [[magus]]
 hostname = "tohsa.ka"
 path_begin = "/api"
-certificate = "assets/certificate.pem"
-key = "assets/key.pem"
-certificate_chain = "assets/certificate_chain.pem"
+certificate = "assets/certs/certificate.pem"
+key = "assets/certs/key.pem"
+certificate_chain = "assets/certs/certificate_chain.pem"
 frontends = ["HTTP", "HTTPS"]
 backends  = ["127.0.0.1:1021"]
 sticky_session = false

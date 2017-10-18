@@ -29,6 +29,7 @@ mod parser;
 mod watcher;
 
 use clap::{App, Arg};
+use sozu_command::config::Config;
 
 use std::time::Duration;
 
@@ -42,18 +43,19 @@ fn main() {
             .short("c")
             .long("config")
             .value_name("FILE")
-            .help("What config file to watch")
-            .default_value("applications.toml")
+            .help("What sozu config to read from")
+            .default_value("config.toml")
             .takes_value(true)
             .required(false)
         )
-        .arg(Arg::with_name("socket")
-            .short("s")
-            .long("socket")
-            .value_name("SOCKET_PATH")
-            .help("What socket sozu is listening on")
+        .arg(Arg::with_name("applications")
+            .short("a")
+            .long("applications")
+            .value_name("FILE")
+            .help("What application config file to watch")
+            .default_value("applications.toml")
             .takes_value(true)
-            .required(true)
+            .required(false)
         )
         .arg(Arg::with_name("interval")
             .short("i")
@@ -66,14 +68,17 @@ fn main() {
         )
         .get_matches();
 
-    let config_file = matches.value_of("config").unwrap();
-    let socket_path = matches.value_of("socket").unwrap();
+    let applications_file = matches.value_of("applications").unwrap();
+
+    let sozu_config_path = matches.value_of("config").unwrap();
+    let sozu_config = Config::load_from_path(sozu_config_path).unwrap();
+
     let update_interval = matches.value_of("interval").map(|value| {
         let parsed_value = value.parse::<u64>().expect("interval must be an integer");
         Duration::from_secs(parsed_value)
     }).unwrap();
 
-    match watcher::watch(config_file, socket_path, update_interval) {
+    match watcher::watch(applications_file, &sozu_config.command_socket, update_interval) {
         Ok(_) => {
             info!("Exiting sozuconfw");
         }

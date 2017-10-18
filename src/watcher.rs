@@ -11,12 +11,12 @@ use util::errors::*;
 use parser::parse_config_file;
 use rpc::{get_config_state, execute_orders};
 
-pub fn watch(config_file: &str, socket_path: &str, update_interval: Duration) -> Result<()> {
+pub fn watch(application_file: &str, socket_path: &str, update_interval: Duration) -> Result<()> {
     let (tx, rx) = channel();
 
-    info!("Watching file `{}`. Updating every {} second(s).", config_file, update_interval.as_secs());
+    info!("Watching file `{}`. Updating every {} second(s).", application_file, update_interval.as_secs());
     let mut watcher: RecommendedWatcher = Watcher::new(tx, update_interval)?;
-    watcher.watch(config_file, RecursiveMode::NonRecursive)?;
+    watcher.watch(application_file, RecursiveMode::NonRecursive)?;
 
     let mut core = Core::new()?;
     let handle = core.handle();
