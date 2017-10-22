@@ -55,6 +55,8 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
                     }
                     ConfigMessageStatus::Ok => {
                         let (item, action) = match order {
+                            Order::AddApplication(_) => ("Application", "added"),
+                            Order::RemoveApplication(_) => ("Application", "removed"),
                             Order::AddInstance(_) => ("Backend", "added"),
                             Order::RemoveInstance(_) => ("Backend", "removed"),
                             Order::AddCertificate(_) => ("Certificate", "added"),
