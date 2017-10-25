@@ -14,7 +14,7 @@ pub mod errors {
             Toml(de::Error);
             Notify(notify::Error);
             Json(serde_json::Error);
-            Channel(mpsc::RecvError);
+            Channel(mpsc::TryRecvError);
             OpenSSL(openssl::error::ErrorStack);
         }
 

@@ -4,18 +4,18 @@ use tokio_core::reactor::Core;
 use sozu_command::state::ConfigState;
 use notify::{RecommendedWatcher, Watcher, RecursiveMode, DebouncedEvent};
 
-use std::time::Duration;
-use std::sync::mpsc::channel;
+use std::time::{Duration, Instant};
+use std::sync::mpsc::{channel, TryRecvError};
 
 use util::errors::*;
 use parser::parse_config_file;
 use rpc::{get_config_state, execute_orders};
 
-pub fn watch(application_file: &str, socket_path: &str, update_interval: Duration) -> Result<()> {
+pub fn watch(application_file: &str, socket_path: &str, watch_interval: Duration, refresh_interval: Duration) -> Result<()> {
     let (tx, rx) = channel();
 
-    info!("Watching file `{}`. Updating every {} second(s).", application_file, update_interval.as_secs());
-    let mut watcher: RecommendedWatcher = Watcher::new(tx, update_interval)?;
+    info!("Watching file `{}`. Updating every {} second(s).", application_file, watch_interval.as_secs());
+    let mut watcher: RecommendedWatcher = Watcher::new(tx, watch_interval)?;
     watcher.watch(application_file, RecursiveMode::NonRecursive)?;
 
     let mut core = Core::new()?;
@@ -26,8 +26,17 @@ pub fn watch(application_file: &str, socket_path: &str, update_interval: Duratio
     let mut current_state: ConfigState = core.run(config_state_future)?;
     info!("Current state initialized. Waiting for changes...");
 
+    let mut last_sync = Instant::now();
     loop {
-        match rx.recv() {
+        if last_sync.elapsed().ge(&refresh_interval) {
+            info!("Refreshing config state.");
+            let execution_future = get_config_state(socket_path, &handle)?;
+            current_state = core.run(execution_future)?;
+            last_sync = Instant::now();
+            info!("Config state refreshed.");
+        }
+
+        match rx.try_recv() {
             Ok(event) => {
                 match event {
                     DebouncedEvent::Write(path) | DebouncedEvent::Create(path) | DebouncedEvent::Chmod(path) => {
@@ -48,6 +57,7 @@ pub fn watch(application_file: &str, socket_path: &str, update_interval: Duratio
                                         });
 
                                     current_state = core.run(execution_future)?;
+                                    last_sync = Instant::now();
                                 } else {
                                     warn!("No changes made.");
                                 }
@@ -73,6 +83,7 @@ pub fn watch(application_file: &str, socket_path: &str, update_interval: Duratio
                     }
                 }
             }
+            Err(TryRecvError::Empty) => {}
             Err(e) => {
                 error!("Cannot poll file.");
                 return Err(e.into());

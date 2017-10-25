@@ -8,9 +8,10 @@ sozuconfw [OPTIONS]
 
 Here is an overview and brief description of the options made available:
 ```
--c, --config <FILE>           What sozu config to read from [default: config.toml]
--a, --applications <FILE>     What application config file to watch [default: applications.toml]
--i, --interval <SECONDS>      How often to check for file changes [default: 5]
+-c, --config    <FILE>          What sozu config to read from [default: config.toml]
+-a, --apps      <FILE>          What application config file to watch [default: applications.toml]
+-w, --watch     <SECONDS>       How often to check for file changes [default: 5]
+-r, --refresh   <SECONDS>       How often to resync with sozu [default: 240]
 ```
 
 You can turn on logging by setting the `RUST_LOG` environment variable. More details can be found [here](https://doc.rust-lang.org/log/env_logger/index.html#enabling-logging).
@@ -73,4 +74,4 @@ sticky_session = false
 
 If `sticky_session` is omitted, it is set to false.
 
-A final note, this file may be named anything you want as long as you set `--applications`. Otherwise `sozuconf` will look for `applications.toml` in `$PWD`.
+A final note, this file may be named anything you want as long as you set `--apps`. Otherwise `sozuconf` will look for `applications.toml` in `$PWD`.

@@ -48,37 +48,51 @@ fn main() {
             .takes_value(true)
             .required(false)
         )
-        .arg(Arg::with_name("applications")
+        .arg(Arg::with_name("apps")
             .short("a")
-            .long("applications")
+            .long("apps")
             .value_name("FILE")
             .help("What application config file to watch")
             .default_value("applications.toml")
             .takes_value(true)
             .required(false)
         )
-        .arg(Arg::with_name("interval")
-            .short("i")
-            .long("interval")
+        .arg(Arg::with_name("watch")
+            .short("w")
+            .long("watch")
             .value_name("SECONDS")
             .help("How often to check for file changes")
             .default_value("5")
             .takes_value(true)
             .required(false)
         )
+        .arg(Arg::with_name("refresh")
+            .short("r")
+            .long("refresh")
+            .value_name("SECONDS")
+            .help("How often to resync with sozu")
+            .default_value("240")
+            .takes_value(true)
+            .required(false)
+        )
         .get_matches();
 
-    let applications_file = matches.value_of("applications").unwrap();
+    let applications_file = matches.value_of("apps").unwrap();
 
     let sozu_config_path = matches.value_of("config").unwrap();
     let sozu_config = Config::load_from_path(sozu_config_path).unwrap();
 
-    let update_interval = matches.value_of("interval").map(|value| {
+    let watch_interval = matches.value_of("watch").map(|value| {
         let parsed_value = value.parse::<u64>().expect("interval must be an integer");
         Duration::from_secs(parsed_value)
     }).unwrap();
 
-    match watcher::watch(applications_file, &sozu_config.command_socket, update_interval) {
+    let refresh_interval = matches.value_of("refresh").map(|value| {
+        let parsed_value = value.parse::<u64>().expect("interval must be an integer");
+        Duration::from_secs(parsed_value)
+    }).unwrap();
+
+    match watcher::watch(applications_file, &sozu_config.command_socket, watch_interval, refresh_interval) {
         Ok(_) => {
             info!("Exiting sozuconfw");
         }
