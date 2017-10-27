@@ -66,15 +66,6 @@ fn main() {
             .takes_value(true)
             .required(false)
         )
-        .arg(Arg::with_name("refresh")
-            .short("r")
-            .long("refresh")
-            .value_name("SECONDS")
-            .help("How often to resync with sozu")
-            .default_value("240")
-            .takes_value(true)
-            .required(false)
-        )
         .get_matches();
 
     let applications_file = matches.value_of("apps").unwrap();
@@ -87,12 +78,7 @@ fn main() {
         Duration::from_secs(parsed_value)
     }).unwrap();
 
-    let refresh_interval = matches.value_of("refresh").map(|value| {
-        let parsed_value = value.parse::<u64>().expect("interval must be an integer");
-        Duration::from_secs(parsed_value)
-    }).unwrap();
-
-    match watcher::watch(applications_file, &sozu_config.command_socket, watch_interval, refresh_interval) {
+    match watcher::watch(applications_file, &sozu_config.command_socket, watch_interval) {
         Ok(_) => {
             info!("Exiting sozuconfw");
         }
