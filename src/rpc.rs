@@ -97,8 +97,12 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> B
     Box::new(future::join_all(message_futures).into_future())
 }
 
-pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future<Item=ConfigState, Error=Error>>> {
-    let stream = UnixStream::connect(socket_path, handle)?;
+pub fn get_config_state(socket_path: &str, handle: &Handle) -> Box<Future<Item=ConfigState, Error=Error>> {
+    let stream = match UnixStream::connect(socket_path, handle) {
+        Ok(stream) => stream,
+        Err(e) => return Box::new(future::err(e.into()))
+    };
+
     let mut client = SozuCommandClient::new(stream);
 
     let message = ConfigMessage::new(
@@ -124,7 +128,7 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future
         })
         .into_future();
 
-    Ok(Box::new(future))
+    Box::new(future)
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]

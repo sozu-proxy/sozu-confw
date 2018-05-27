@@ -31,7 +31,7 @@ pub fn watch(application_file: &str, socket_path: &str, watch_interval: Duration
                         match parse_config_file(&path) {
                             Ok(new_state) => {
                                 info!("Retrieving current proxy state.");
-                                let orders_future = get_config_state(socket_path, &handle)?
+                                let orders_future = get_config_state(socket_path, &handle)
                                     .and_then(|current_state| {
                                         info!("Current proxy state retrieved, generating orders.");
                                         future::ok(current_state.diff(&new_state))
