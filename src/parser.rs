@@ -1,11 +1,29 @@
 use toml;
-use sozu_command::config::Config;
-use sozu_command::state::ConfigState;
-use sozu_command::certificate::{calculate_fingerprint, split_certificate_chain};
-use sozu_command::messages::{Application, CertificateAndKey, CertFingerprint, HttpFront, HttpsFront, Instance, Order};
+use sozu_command::{
+    state::ConfigState,
+    certificate::{
+        calculate_fingerprint,
+        split_certificate_chain
+    },
+    config::{
+        Config,
+        ProxyProtocolConfig
+    },
+    messages::{
+        Application,
+        AddCertificate,
+        CertificateAndKey,
+        CertFingerprint,
+        HttpFront,
+        HttpsFront,
+        Order,
+    },
+};
 
-use std::path::PathBuf;
-use std::collections::{HashMap, HashSet};
+use std::{
+    path::PathBuf,
+    collections::{HashMap, HashSet},
+};
 
 use util::errors::*;
 
@@ -28,9 +46,13 @@ fn parse_config(data: &str) -> Result<ConfigState> {
 
             {
                 let sticky_session = routing_config.sticky_session.unwrap_or(false);
+                let https_redirect = routing_config.https_redirect.unwrap_or(false);
+
                 let add_instance = &Order::AddApplication(Application {
                     app_id: app_id.clone(),
-                    sticky_session
+                    proxy_protocol: routing_config.proxy_protocol,
+                    sticky_session,
+                    https_redirect,
                 });
 
                 state.handle_order(add_instance);
@@ -64,16 +86,20 @@ fn parse_config(data: &str) -> Result<ConfigState> {
                 let certificate_and_key = CertificateAndKey {
                     certificate,
                     key,
-                    certificate_chain
+                    certificate_chain,
                 };
 
                 let fingerprint: CertFingerprint;
                 {
-                    let bytes = calculate_fingerprint(&certificate_and_key.certificate.as_bytes()[..])?;
+                    let bytes = calculate_fingerprint(&certificate_and_key.certificate.as_bytes()[..])
+                        .ok_or_else(|| ErrorKind::FingerprintError)?;
                     fingerprint = CertFingerprint(bytes);
                 }
 
-                let add_certificate = &Order::AddCertificate(certificate_and_key);
+                let add_certificate = &Order::AddCertificate(AddCertificate {
+                    certificate: certificate_and_key,
+                    names: vec![hostname.clone()],
+                });
                 let add_https_front = &Order::AddHttpsFront(HttpsFront {
                     app_id: app_id.clone(),
                     hostname: hostname.clone(),
@@ -83,35 +109,6 @@ fn parse_config(data: &str) -> Result<ConfigState> {
 
                 state.handle_order(add_certificate);
                 state.handle_order(add_https_front);
-            }
-
-            {
-                let authorities = routing_config.backends.iter().map(|authority| {
-                    let mut split = authority.split(':');
-
-                    match (split.next(), split.next()) {
-                        (Some(host), Some(port)) => {
-                            port.parse::<u16>().map(|port| (host.to_owned(), port))
-                                .chain_err(|| ErrorKind::ParseError("Could not parse port".to_owned()))
-                        }
-                        (Some(host), None) => Ok((host.to_owned(), 80)),
-                        _ => Err(ErrorKind::ParseError("Missing host".to_owned()).into())
-                    }
-                }).collect::<Result<Vec<(String, u16)>>>()?;
-
-                let add_instances: Vec<Order> = authorities.iter().map(|authority| {
-                    let (ref host, port): (String, u16) = *authority;
-
-                    Order::AddInstance(Instance {
-                        app_id: app_id.clone(),
-                        ip_address: host.clone(),
-                        port
-                    })
-                }).collect();
-
-                for order in add_instances {
-                    state.handle_order(&order);
-                }
             }
         }
     }
@@ -128,5 +125,7 @@ struct RoutingConfig<'a> {
     certificate_chain: Option<&'a str>,
     frontends: HashSet<&'a str>,
     backends: Vec<&'a str>,
-    sticky_session: Option<bool>
+    sticky_session: Option<bool>,
+    https_redirect: Option<bool>,
+    proxy_protocol: Option<ProxyProtocolConfig>,
 }

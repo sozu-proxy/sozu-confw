@@ -1,14 +1,24 @@
 use serde_json;
-use futures::future;
-use futures::IntoFuture;
 use tokio_uds::UnixStream;
 use rand::{thread_rng, Rng};
-use futures::future::Future;
 use command::SozuCommandClient;
 use tokio_core::reactor::Handle;
-use sozu_command::messages::Order;
-use sozu_command::state::ConfigState;
-use sozu_command::data::{ConfigCommand, ConfigMessage, ConfigMessageStatus};
+
+use futures::{
+    future,
+    IntoFuture,
+    future::Future,
+};
+
+use sozu_command::{
+    messages::Order,
+    state::ConfigState,
+    data::{
+        ConfigCommand,
+        ConfigMessage,
+        ConfigMessageStatus,
+    },
+};
 
 use util::errors::*;
 
@@ -17,8 +27,12 @@ fn generate_id() -> String {
     format!("ID-{}", s)
 }
 
-pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> Result<Box<Future<Item=Vec<()>, Error=Error>>> {
-    let stream = UnixStream::connect(socket_path, handle)?;
+pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> Box<Future<Item=Vec<()>, Error=Error>> {
+    let stream = match UnixStream::connect(socket_path, handle) {
+        Ok(stream) => stream,
+        Err(e) => return Box::new(future::err(e.into()))
+    };
+
     let mut client = SozuCommandClient::new(stream);
 
     let mut message_futures: Vec<Box<Future<Item=(), Error=Error>>> = Vec::new();
@@ -27,7 +41,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
         let message = ConfigMessage::new(
             id.clone(),
             ConfigCommand::ProxyConfiguration(order.clone()),
-            None
+            None,
         );
 
         let order = order.clone();
@@ -57,10 +71,9 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
                         let (item, action) = match order {
                             Order::AddApplication(_) => ("Application", "added"),
                             Order::RemoveApplication(_) => ("Application", "removed"),
-                            Order::AddInstance(_) => ("Backend", "added"),
-                            Order::RemoveInstance(_) => ("Backend", "removed"),
                             Order::AddCertificate(_) => ("Certificate", "added"),
                             Order::RemoveCertificate(_) => ("Certificate", "removed"),
+                            Order::ReplaceCertificate(_) => ("Certificate", "replaced"),
                             Order::AddHttpFront(_) => ("HTTP front", "added"),
                             Order::RemoveHttpFront(_) => ("HTTP front", "removed"),
                             Order::AddHttpsFront(_) => ("HTTPS front", "added"),
@@ -81,9 +94,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
         message_futures.push(Box::new(future));
     }
 
-    let future = future::join_all(message_futures).into_future();
-
-    Ok(Box::new(future))
+    Box::new(future::join_all(message_futures).into_future())
 }
 
 pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future<Item=ConfigState, Error=Error>>> {
@@ -93,7 +104,7 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future
     let message = ConfigMessage::new(
         generate_id(),
         ConfigCommand::DumpState,
-        None
+        None,
     );
 
     let future = client.send(message)
@@ -119,5 +130,5 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future
 #[derive(Debug, Default, Clone, Deserialize)]
 struct ConfigStateResponse<'a> {
     id: &'a str,
-    state: ConfigState
+    state: ConfigState,
 }

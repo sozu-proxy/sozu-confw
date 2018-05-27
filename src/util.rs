@@ -4,8 +4,8 @@ pub mod errors {
     use std::io;
     use toml::de;
     use serde_json;
-    use std::sync::mpsc;
 
+    use std::sync::mpsc;
     use std::path::PathBuf;
 
     error_chain! {
@@ -38,6 +38,10 @@ pub mod errors {
             ProxyError(error: String) {
                 description("the proxy encountered an error")
                 display("Proxy responded with an error: {}.", error)
+            }
+            FingerprintError {
+                description("could not calculate fingerprint from cert")
+                display("Unable to calculate a fingerprint for the provided certificate.")
             }
         }
     }

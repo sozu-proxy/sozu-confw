@@ -41,7 +41,7 @@ pub fn watch(application_file: &str, socket_path: &str, watch_interval: Duration
 
                                 if !orders.is_empty() {
                                     info!("Sending new configuration to server.");
-                                    let execution_future = execute_orders(socket_path, &handle, &orders)?;
+                                    let execution_future = execute_orders(socket_path, &handle, &orders);
                                     core.run(execution_future)?;
                                 } else {
                                     warn!("No changes made.");
