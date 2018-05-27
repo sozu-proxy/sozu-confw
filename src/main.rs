@@ -34,7 +34,7 @@ use sozu_command::config::Config;
 use std::time::Duration;
 
 fn main() {
-    pretty_env_logger::init().unwrap();
+    pretty_env_logger::init();
 
     let matches = App::new("sozuconfw")
         .version(crate_version!())
