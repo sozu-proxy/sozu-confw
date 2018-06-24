@@ -1,44 +1,29 @@
-pub mod errors {
-    use notify;
-    use openssl;
-    use std::io;
-    use toml::de;
-    use serde_json;
-    use std::sync::mpsc;
+use sozu_command::messages::Order;
 
-    use std::path::PathBuf;
+use std::path::PathBuf;
 
-    error_chain! {
-        foreign_links {
-            Io(io::Error);
-            Toml(de::Error);
-            Notify(notify::Error);
-            Json(serde_json::Error);
-            Channel(mpsc::RecvError);
-            OpenSSL(openssl::error::ErrorStack);
-        }
+#[derive(Debug, Fail)]
+pub enum OperationError {
+    #[fail(display = "path provided was not valid: {:?}", _0)]
+    InvalidPath(PathBuf),
+    #[fail(display = "could not load file: {:?}", _0)]
+    FileLoad(PathBuf),
+}
 
-        errors {
-            InvalidPath(path: PathBuf) {
-                description("path is invalid")
-                display("Path '{:?}' is invalid.", path)
-            }
-            FileLoad(filename: String) {
-                description("could not load file")
-                display("File '{}' could not be loaded.", filename)
-            }
-            ParseError(issue: String) {
-                description("encountered error while parsing")
-                display("Parse error: {}.", issue)
-            }
-            MissingItem(item: String) {
-                description("missing required item")
-                display("Item `{}` required, but not present.", item)
-            }
-            ProxyError(error: String) {
-                description("the proxy encountered an error")
-                display("Proxy responded with an error: {}.", error)
-            }
-        }
-    }
+#[derive(Debug, Fail)]
+pub enum ParseError {
+    #[fail(display = "missing required item: {}", _0)]
+    MissingItem(String)
+}
+
+#[derive(Debug, Fail)]
+pub enum RpcError {
+    #[fail(display = "message wasn't properly formed: {}", _0)]
+    MalformedMessage(String),
+    #[fail(display = "failed to execute order: {}", _0)]
+    ExecutionFailure(String),
+    #[fail(display = "unexpected order")]
+    UnexpectedResponse,
+    #[fail(display = "unknown order: {:?}", _0)]
+    UnsupportedOrder(Order),
 }

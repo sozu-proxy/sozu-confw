@@ -1,33 +1,49 @@
 use serde_json;
-use futures::future;
-use futures::IntoFuture;
+use failure::Error;
 use tokio_uds::UnixStream;
 use rand::{thread_rng, Rng};
-use futures::future::Future;
 use command::SozuCommandClient;
 use tokio_core::reactor::Handle;
-use sozu_command::messages::Order;
-use sozu_command::state::ConfigState;
-use sozu_command::data::{ConfigCommand, ConfigMessage, ConfigMessageStatus};
 
-use util::errors::*;
+use futures::{
+    future,
+    IntoFuture,
+    future::Future,
+};
+
+use sozu_command::{
+    messages::Order,
+    state::ConfigState,
+    data::{
+        AnswerData,
+        ConfigCommand,
+        ConfigMessage,
+        ConfigMessageStatus,
+    },
+};
+
+use util::RpcError;
 
 fn generate_id() -> String {
     let s: String = thread_rng().gen_ascii_chars().take(6).collect();
     format!("ID-{}", s)
 }
 
-pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> Result<Box<Future<Item=Vec<()>, Error=Error>>> {
-    let stream = UnixStream::connect(socket_path, handle)?;
+pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> Box<dyn Future<Item=Vec<()>, Error=Error>> {
+    let stream = match UnixStream::connect(socket_path, handle) {
+        Ok(stream) => stream,
+        Err(e) => return Box::new(future::err(e.into()))
+    };
+
     let mut client = SozuCommandClient::new(stream);
 
-    let mut message_futures: Vec<Box<Future<Item=(), Error=Error>>> = Vec::new();
+    let mut message_futures: Vec<Box<dyn Future<Item=(), Error=Error>>> = Vec::new();
     for order in orders {
         let id = generate_id();
         let message = ConfigMessage::new(
             id.clone(),
             ConfigCommand::ProxyConfiguration(order.clone()),
-            None
+            None,
         );
 
         let order = order.clone();
@@ -39,7 +55,7 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
             .and_then(move |response| {
                 if id != response.id {
                     error!("Received message with invalid id: {:?}.", response);
-                    return Err(ErrorKind::ProxyError("Invalid message ID".to_string()).into());
+                    return Err(RpcError::MalformedMessage("Invalid message ID".to_string()).into());
                 }
 
                 match response.status {
@@ -51,23 +67,24 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
                     }
                     ConfigMessageStatus::Error => {
                         error!("Could not execute order: {}", response.message);
-                        Err(ErrorKind::ProxyError(response.message).into())
+                        Err(RpcError::ExecutionFailure(response.message).into())
                     }
                     ConfigMessageStatus::Ok => {
                         let (item, action) = match order {
                             Order::AddApplication(_) => ("Application", "added"),
                             Order::RemoveApplication(_) => ("Application", "removed"),
-                            Order::AddInstance(_) => ("Backend", "added"),
-                            Order::RemoveInstance(_) => ("Backend", "removed"),
+                            Order::AddBackend(_) => ("Backend", "added"),
+                            Order::RemoveBackend(_) => ("Backend", "removed"),
                             Order::AddCertificate(_) => ("Certificate", "added"),
                             Order::RemoveCertificate(_) => ("Certificate", "removed"),
+                            Order::ReplaceCertificate(_) => ("Certificate", "replaced"),
                             Order::AddHttpFront(_) => ("HTTP front", "added"),
                             Order::RemoveHttpFront(_) => ("HTTP front", "removed"),
                             Order::AddHttpsFront(_) => ("HTTPS front", "added"),
                             Order::RemoveHttpsFront(_) => ("HTTPS front", "removed"),
                             order => {
                                 warn!("Unsupported order: {:?}", order);
-                                return Err(ErrorKind::ProxyError("Unsupported order".to_string()).into());
+                                return Err(RpcError::UnsupportedOrder(order).into());
                             }
                         };
 
@@ -81,19 +98,21 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> R
         message_futures.push(Box::new(future));
     }
 
-    let future = future::join_all(message_futures).into_future();
-
-    Ok(Box::new(future))
+    Box::new(future::join_all(message_futures).into_future())
 }
 
-pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future<Item=ConfigState, Error=Error>>> {
-    let stream = UnixStream::connect(socket_path, handle)?;
+pub fn get_config_state(socket_path: &str, handle: &Handle) -> Box<dyn Future<Item=ConfigState, Error=Error>> {
+    let stream = match UnixStream::connect(socket_path, handle) {
+        Ok(stream) => stream,
+        Err(e) => return Box::new(future::err(e.into()))
+    };
+
     let mut client = SozuCommandClient::new(stream);
 
     let message = ConfigMessage::new(
         generate_id(),
         ConfigCommand::DumpState,
-        None
+        None,
     );
 
     let future = client.send(message)
@@ -102,8 +121,11 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future
             new_error
         })
         .and_then(|answer| {
-            let config_state: Result<ConfigState> = serde_json::from_str(&answer.message)
-                .map(|config_state: ConfigStateResponse| config_state.state)
+            let config_state: Result<ConfigState, Error> = answer.data.ok_or(RpcError::MalformedMessage("Unable to parse response".to_string()))
+                .and_then(|data: AnswerData| match data {
+                    AnswerData::State(config_state) => Ok(config_state),
+                    _ => Err(RpcError::UnexpectedResponse)
+                })
                 .map_err(|e| {
                     let new_error: Error = e.into();
                     new_error
@@ -113,11 +135,5 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Result<Box<Future
         })
         .into_future();
 
-    Ok(Box::new(future))
-}
-
-#[derive(Debug, Default, Clone, Deserialize)]
-struct ConfigStateResponse<'a> {
-    id: &'a str,
-    state: ConfigState
+    Box::new(future)
 }

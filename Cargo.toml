@@ -10,20 +10,20 @@ license = "AGPL-3.0"
 categories = ["network-programming"]
 
 [dependencies]
-log = "^0.3.8"
+log = "^0.4.1"
 clap = "^2.19.0"
 serde = "^1.0.0"
 toml = "^0.4"
 rand = "^0.3.16"
 notify = "^4.0.0"
 openssl = "^0.9.0"
+failure = "^0.1.1"
 futures = "^0.1"
 tokio-io = "^0.1"
 tokio-uds = "^0.1"
 tokio-core = "^0.1"
 serde_json = "^1.0.0"
-error-chain = "^0.11.0"
 serde_derive = "^1.0.0"
-pretty_env_logger = "^0.1.1"
-sozu-command-lib = { git = "https://github.com/sozu-proxy/sozu" }
-sozu-command-futures = { git = "https://github.com/sozu-proxy/sozu-command-futures" }
+sozu-command-lib = "0.6"
+pretty_env_logger = "^0.2.3"
+sozu-command-futures = "0.6"
