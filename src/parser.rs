@@ -1,13 +1,14 @@
 use toml;
+use failure::{Error, err_msg};
 use sozu_command::{
     state::ConfigState,
     certificate::{
         calculate_fingerprint,
-        split_certificate_chain
+        split_certificate_chain,
     },
     config::{
         Config,
-        ProxyProtocolConfig
+        ProxyProtocolConfig,
     },
     messages::{
         Application,
@@ -25,16 +26,16 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use util::errors::*;
+use util::{OperationError, ParseError};
 
-pub fn parse_config_file(path: &PathBuf) -> Result<ConfigState> {
-    let path = path.to_str().ok_or_else(|| ErrorKind::InvalidPath(path.to_path_buf()))?;
+pub fn parse_config_file(path: &PathBuf) -> Result<ConfigState, Error> {
+    let path = path.to_str().ok_or_else(|| OperationError::FileLoad(path.to_path_buf()))?;
     let data = Config::load_file(path)?;
 
     parse_config(&data)
 }
 
-fn parse_config(data: &str) -> Result<ConfigState> {
+fn parse_config(data: &str) -> Result<ConfigState, Error> {
     let mut state = ConfigState::new();
 
     let app_map: HashMap<String, Vec<RoutingConfig>> = toml::from_str(data)?;
@@ -69,17 +70,26 @@ fn parse_config(data: &str) -> Result<ConfigState> {
             }
 
             if routing_config.frontends.contains(&"HTTPS") {
-                let certificate = routing_config.certificate
-                    .ok_or_else(|| ErrorKind::MissingItem("Certificate".to_string()).into())
-                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad(path.to_string())))?;
+                let certificate: String = routing_config.certificate
+                    .ok_or_else(|| {
+                        let new_error: Error = ParseError::MissingItem("Certificate".to_string()).into();
+                        new_error
+                    })
+                    .and_then(|path| Config::load_file(path).map_err(|e| e.into()))?;
 
-                let key = routing_config.key
-                    .ok_or_else(|| ErrorKind::MissingItem("Key".to_string()).into())
-                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad(path.to_string())))?;
+                let key: String = routing_config.key
+                    .ok_or_else(|| {
+                        let new_error: Error = ParseError::MissingItem("Key".to_string()).into();
+                        new_error
+                    })
+                    .and_then(|path| Config::load_file(path).map_err(|e| e.into()))?;
 
                 let certificate_chain = routing_config.certificate_chain
-                    .ok_or_else(|| ErrorKind::MissingItem("Certificate Chain".to_string()).into())
-                    .and_then(|path| Config::load_file(path).chain_err(|| ErrorKind::FileLoad(path.to_string())))
+                    .ok_or_else(|| {
+                        let new_error: Error = ParseError::MissingItem("Certificate Chain".to_string()).into();
+                        new_error
+                    })
+                    .and_then(|path| Config::load_file(path).map_err(|e| e.into()))
                     .map(split_certificate_chain)
                     .unwrap_or_default();
 
@@ -92,7 +102,7 @@ fn parse_config(data: &str) -> Result<ConfigState> {
                 let fingerprint: CertFingerprint;
                 {
                     let bytes = calculate_fingerprint(&certificate_and_key.certificate.as_bytes()[..])
-                        .ok_or_else(|| ErrorKind::FingerprintError)?;
+                        .ok_or_else(|| err_msg("Could not calculate fingerprint for cert and key"))?;
                     fingerprint = CertFingerprint(bytes);
                 }
 

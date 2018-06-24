@@ -1,14 +1,14 @@
 #[macro_use]
+extern crate log;
+
+#[macro_use]
 extern crate clap;
 
 #[macro_use]
+extern crate failure;
+
+#[macro_use]
 extern crate serde_derive;
-
-#[macro_use]
-extern crate error_chain;
-
-#[macro_use]
-extern crate log;
 
 extern crate toml;
 extern crate rand;
@@ -83,7 +83,7 @@ fn main() {
             info!("Exiting sozuconfw");
         }
         Err(err) => {
-            error!("{}", err.0);
+            error!("{}", err);
         }
     };
 }

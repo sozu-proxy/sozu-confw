@@ -1,3 +1,4 @@
+use failure::Error;
 use futures::Future;
 use futures::future;
 use tokio_core::reactor::Core;
@@ -6,11 +7,11 @@ use notify::{RecommendedWatcher, Watcher, RecursiveMode, DebouncedEvent};
 use std::time::Duration;
 use std::sync::mpsc::channel;
 
-use util::errors::*;
+use util::OperationError;
 use parser::parse_config_file;
 use rpc::{get_config_state, execute_orders};
 
-pub fn watch(application_file: &str, socket_path: &str, watch_interval: Duration) -> Result<()> {
+pub fn watch(application_file: &str, socket_path: &str, watch_interval: Duration) -> Result<(), Error> {
     let (tx, rx) = channel();
 
     info!("Watching file `{}`. Updating every {} second(s).", application_file, watch_interval.as_secs());
@@ -55,13 +56,13 @@ pub fn watch(application_file: &str, socket_path: &str, watch_interval: Duration
                     }
                     DebouncedEvent::Rename(old_path, new_path) => {
                         // Track changed filename
-                        info!("File renamed:\n\tOld path: {}\n\tNew path: {}.",
-                              old_path.to_str().ok_or_else(|| ErrorKind::InvalidPath(old_path.clone()))?,
-                              new_path.to_str().ok_or_else(|| ErrorKind::InvalidPath(new_path.clone()))?
-                        );
+                        let old_path_str = old_path.to_str().ok_or_else(|| OperationError::InvalidPath(old_path.clone()))?;
+                        let new_path_str = new_path.to_str().ok_or_else(|| OperationError::InvalidPath(new_path.clone()))?;
 
-                        watcher.unwatch(old_path)?;
-                        watcher.watch(new_path, RecursiveMode::NonRecursive)?;
+                        info!("File renamed:\n\tOld path: {}\n\tNew path: {}.", old_path_str, new_path_str);
+
+                        watcher.unwatch(old_path.clone())?;
+                        watcher.watch(new_path.clone(), RecursiveMode::NonRecursive)?;
                     }
                     event => {
                         debug!("Unhandled event: {:?}.", event);
