@@ -22,6 +22,8 @@ pub enum RpcError {
     MalformedMessage(String),
     #[fail(display = "failed to execute order: {}", _0)]
     ExecutionFailure(String),
+    #[fail(display = "unexpected order")]
+    UnexpectedResponse,
     #[fail(display = "unknown order: {:?}", _0)]
     UnsupportedOrder(Order),
 }

@@ -15,6 +15,7 @@ use sozu_command::{
     messages::Order,
     state::ConfigState,
     data::{
+        AnswerData,
         ConfigCommand,
         ConfigMessage,
         ConfigMessageStatus,
@@ -72,6 +73,8 @@ pub fn execute_orders(socket_path: &str, handle: &Handle, orders: &[Order]) -> B
                         let (item, action) = match order {
                             Order::AddApplication(_) => ("Application", "added"),
                             Order::RemoveApplication(_) => ("Application", "removed"),
+                            Order::AddBackend(_) => ("Backend", "added"),
+                            Order::RemoveBackend(_) => ("Backend", "removed"),
                             Order::AddCertificate(_) => ("Certificate", "added"),
                             Order::RemoveCertificate(_) => ("Certificate", "removed"),
                             Order::ReplaceCertificate(_) => ("Certificate", "replaced"),
@@ -118,8 +121,11 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Box<dyn Future<It
             new_error
         })
         .and_then(|answer| {
-            let config_state: Result<ConfigState, Error> = serde_json::from_str(&answer.message)
-                .map(|config_state: ConfigStateResponse| config_state.state)
+            let config_state: Result<ConfigState, Error> = answer.data.ok_or(RpcError::MalformedMessage("Unable to parse response".to_string()))
+                .and_then(|data: AnswerData| match data {
+                    AnswerData::State(config_state) => Ok(config_state),
+                    _ => Err(RpcError::UnexpectedResponse)
+                })
                 .map_err(|e| {
                     let new_error: Error = e.into();
                     new_error
@@ -130,10 +136,4 @@ pub fn get_config_state(socket_path: &str, handle: &Handle) -> Box<dyn Future<It
         .into_future();
 
     Box::new(future)
-}
-
-#[derive(Debug, Default, Clone, Deserialize)]
-struct ConfigStateResponse<'a> {
-    id: &'a str,
-    state: ConfigState,
 }
